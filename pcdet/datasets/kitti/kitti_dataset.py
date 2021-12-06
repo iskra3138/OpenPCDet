@@ -23,22 +23,22 @@ class KittiDataset(DatasetTemplate):
         super().__init__(
             dataset_cfg=dataset_cfg, class_names=class_names, training=training, root_path=root_path, logger=logger
         )
-        self.split = self.dataset_cfg.DATA_SPLIT[self.mode]
-        self.root_split_path = self.root_path / ('training' if self.split != 'test' else 'testing')
+        self.split = self.dataset_cfg.DATA_SPLIT[self.mode] # if training is True, self.mode is 'train'. otherwise it is 'test'
+        self.root_split_path = self.root_path / ('training' if self.split != 'test' else 'testing') #initialized to 'training'
 
         split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
 
         self.kitti_infos = []
-        self.include_kitti_data(self.mode)
+        self.include_kitti_data(self.mode) # if training is True, self.mode is 'train'. otherwise it is 'test'
 
     def include_kitti_data(self, mode):
         if self.logger is not None:
             self.logger.info('Loading KITTI dataset')
         kitti_infos = []
 
-        for info_path in self.dataset_cfg.INFO_PATH[mode]:
-            info_path = self.root_path / info_path
+        for info_path in self.dataset_cfg.INFO_PATH[mode] : # self.dataset_cfg.INFO_PATH is {'train': ['kitti_infos_train.pkl'], 'test': ['kitti_infos_val.pkl']}
+            info_path = self.root_path / info_path # info_path is 'kitti_infos_train.pkl' or 'kitti_infos_val.pkl'
             if not info_path.exists():
                 continue
             with open(info_path, 'rb') as f:
@@ -55,7 +55,7 @@ class KittiDataset(DatasetTemplate):
             dataset_cfg=self.dataset_cfg, class_names=self.class_names, training=self.training, root_path=self.root_path, logger=self.logger
         )
         self.split = split
-        self.root_split_path = self.root_path / ('training' if self.split != 'test' else 'testing')
+        self.root_split_path = self.root_path / ('training' if self.split != 'test' else 'testing') # data of both 'train' and 'val' are included in 'training' path
 
         split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
@@ -147,26 +147,25 @@ class KittiDataset(DatasetTemplate):
 
         return pts_valid_flag
 
-    def get_infos(self, num_workers=4, has_label=True, count_inside_pts=True, sample_id_list=None):
+    def get_infos(self, num_workers=4, has_label=True, count_inside_pts=True, sample_id_list=None): #making pkl files
         import concurrent.futures as futures
 
         def process_single_scene(sample_idx):
-            print('%s sample_idx: %s' % (self.split, sample_idx))
+            print('%s sample_idx: %s' % (self.split, sample_idx)) # self.split: train or val
             info = {}
             pc_info = {'num_features': 4, 'lidar_idx': sample_idx}
             info['point_cloud'] = pc_info
 
             image_info = {'image_idx': sample_idx, 'image_shape': self.get_image_shape(sample_idx)}
             info['image'] = image_info
-            calib = self.get_calib(sample_idx)
 
+            calib = self.get_calib(sample_idx)
             P2 = np.concatenate([calib.P2, np.array([[0., 0., 0., 1.]])], axis=0)
             R0_4x4 = np.zeros([4, 4], dtype=calib.R0.dtype)
             R0_4x4[3, 3] = 1.
             R0_4x4[:3, :3] = calib.R0
             V2C_4x4 = np.concatenate([calib.V2C, np.array([[0., 0., 0., 1.]])], axis=0)
             calib_info = {'P2': P2, 'R0_rect': R0_4x4, 'Tr_velo_to_cam': V2C_4x4}
-
             info['calib'] = calib_info
 
             if has_label:
@@ -188,18 +187,18 @@ class KittiDataset(DatasetTemplate):
                 index = list(range(num_objects)) + [-1] * (num_gt - num_objects)
                 annotations['index'] = np.array(index, dtype=np.int32)
 
-                loc = annotations['location'][:num_objects]
-                dims = annotations['dimensions'][:num_objects]
-                rots = annotations['rotation_y'][:num_objects]
+                loc = annotations['location'][:num_objects] # except DontCare
+                dims = annotations['dimensions'][:num_objects] # except DontCare
+                rots = annotations['rotation_y'][:num_objects] # except DontCare
                 loc_lidar = calib.rect_to_lidar(loc)
                 l, h, w = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3]
                 loc_lidar[:, 2] += h[:, 0] / 2
-                gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, -(np.pi / 2 + rots[..., np.newaxis])], axis=1)
+                gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, -(np.pi / 2 + rots[..., np.newaxis])], axis=1) # shape is (n, 7)
                 annotations['gt_boxes_lidar'] = gt_boxes_lidar
 
                 info['annos'] = annotations
 
-                if count_inside_pts:
+                if count_inside_pts: # visit again
                     points = self.get_lidar(sample_idx)
                     calib = self.get_calib(sample_idx)
                     pts_rect = calib.lidar_to_rect(points[:, 0:3])
@@ -370,24 +369,24 @@ class KittiDataset(DatasetTemplate):
 
     def __getitem__(self, index):
         # index = 4
-        if self._merge_all_iters_to_one_epoch:
+        if self._merge_all_iters_to_one_epoch: # Default is 'False'
             index = index % len(self.kitti_infos)
 
         info = copy.deepcopy(self.kitti_infos[index])
 
-        sample_idx = info['point_cloud']['lidar_idx']
-        img_shape = info['image']['image_shape']
-        calib = self.get_calib(sample_idx)
-        get_item_list = self.dataset_cfg.get('GET_ITEM_LIST', ['points'])
+        sample_idx = info['point_cloud']['lidar_idx'] # index (e.g. 000000)
+        img_shape = info['image']['image_shape'] # e.g. array([ 370, 1224]
+        calib = self.get_calib(sample_idx) # class regarding calibration
+        get_item_list = self.dataset_cfg.get('GET_ITEM_LIST', ['points']) # ['points']
 
         input_dict = {
             'frame_id': sample_idx,
             'calib': calib,
         }
 
-        if 'annos' in info:
-            annos = info['annos']
-            annos = common_utils.drop_info_with_name(annos, name='DontCare')
+        if 'annos' in info: # True in Kitti
+            annos = info['annos'] # e.g. 'annos': {'name': array(['Car', 'Car', 'Car', 'DontCare', 'DontCare'], dtype='<U8')
+            annos = common_utils.drop_info_with_name(annos, name='DontCare') # annos dict except each columns relavant to locations of 'DontCare'
             loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
             gt_names = annos['name']
             gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
@@ -426,8 +425,8 @@ class KittiDataset(DatasetTemplate):
         data_dict['image_shape'] = img_shape
         return data_dict
 
-
-def create_kitti_infos(dataset_cfg, class_names, data_path, save_path, workers=4):
+#python -m pcdet.datasets.kitti.kitti_dataset create_kitti_infos tools/cfgs/dataset_configs/kitti_dataset.yaml
+def create_kitti_infos(dataset_cfg, class_names, data_path, save_path, workers=4):  ## Generate the data infos using tools/cfgs/dataset_configs/kitti_dataset.yaml
     dataset = KittiDataset(dataset_cfg=dataset_cfg, class_names=class_names, root_path=data_path, training=False)
     train_split, val_split = 'train', 'val'
 

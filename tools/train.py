@@ -10,7 +10,7 @@ import torch.distributed as dist
 import torch.nn as nn
 from tensorboardX import SummaryWriter
 
-from pcdet.config import cfg, cfg_from_list, cfg_from_yaml_file, log_config_to_file
+from pcdet.config import cfg, cfg_from_list, cfg_from_yaml_file, log_config_to_file # EasyDict() based parsing
 from pcdet.datasets import build_dataloader
 from pcdet.models import build_network, model_fn_decorator
 from pcdet.utils import common_utils
@@ -37,7 +37,7 @@ def parse_config():
     parser.add_argument('--max_ckpt_save_num', type=int, default=30, help='max number of saved checkpoint')
     parser.add_argument('--merge_all_iters_to_one_epoch', action='store_true', default=False, help='')
     parser.add_argument('--set', dest='set_cfgs', default=None, nargs=argparse.REMAINDER,
-                        help='set extra config keys if needed')
+                        help='set extra config keys if needed') # data type is list and order should be ['key1', 'value1', 'key2', 'value2',...]
 
     parser.add_argument('--max_waiting_mins', type=int, default=0, help='max waiting minutes')
     parser.add_argument('--start_epoch', type=int, default=0, help='')
@@ -45,28 +45,28 @@ def parse_config():
 
     args = parser.parse_args()
 
-    cfg_from_yaml_file(args.cfg_file, cfg)
-    cfg.TAG = Path(args.cfg_file).stem
-    cfg.EXP_GROUP_PATH = '/'.join(args.cfg_file.split('/')[1:-1])  # remove 'cfgs' and 'xxxx.yaml'
+    cfg_from_yaml_file(args.cfg_file, cfg) # making cfg with 'yaml' file
+    cfg.TAG = Path(args.cfg_file).stem # adding key 'TAG', A file name of yaml file is assigned (ex. pointpillar)
+    cfg.EXP_GROUP_PATH = '/'.join(args.cfg_file.split('/')[1:-1])  #remove 'cfgs' and 'xxxx.yaml', A name of path is assigned.
 
-    if args.set_cfgs is not None:
+    if args.set_cfgs is not None: # set extra config keys via args.set_cfgs
         cfg_from_list(args.set_cfgs, cfg)
 
-    return args, cfg
+    return args, cfg # type of cfg is dictionary
 
 
 def main():
     args, cfg = parse_config()
-    if args.launcher == 'none':
-        dist_train = False
+    if args.launcher == 'none': # args.launcher is one of ['none', 'pytorch', 'slurm'] # none means single gpu
+        dist_train = False # argument for distribution train
         total_gpus = 1
-    else:
+    else: # when you train with multiple GPUs
         total_gpus, cfg.LOCAL_RANK = getattr(common_utils, 'init_dist_%s' % args.launcher)(
             args.tcp_port, args.local_rank, backend='nccl'
         )
         dist_train = True
 
-    if args.batch_size is None:
+    if args.batch_size is None: # args.batch_size means batch_size for each GPU
         args.batch_size = cfg.OPTIMIZATION.BATCH_SIZE_PER_GPU
     else:
         assert args.batch_size % total_gpus == 0, 'Batch size should match the number of gpus'
@@ -74,9 +74,9 @@ def main():
 
     args.epochs = cfg.OPTIMIZATION.NUM_EPOCHS if args.epochs is None else args.epochs
 
-    if args.fix_random_seed:
+    if args.fix_random_seed: # default is False
         common_utils.set_random_seed(666)
-
+    # cfg.ROOT_DIR is Path object and made in 'config.py)
     output_dir = cfg.ROOT_DIR / 'output' / cfg.EXP_GROUP_PATH / cfg.TAG / args.extra_tag
     ckpt_dir = output_dir / 'ckpt'
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -90,11 +90,11 @@ def main():
     gpu_list = os.environ['CUDA_VISIBLE_DEVICES'] if 'CUDA_VISIBLE_DEVICES' in os.environ.keys() else 'ALL'
     logger.info('CUDA_VISIBLE_DEVICES=%s' % gpu_list)
 
-    if dist_train:
+    if dist_train: # if train with multi-GPUs
         logger.info('total_batch_size: %d' % (total_gpus * args.batch_size))
-    for key, val in vars(args).items():
+    for key, val in vars(args).items(): # logging args
         logger.info('{:16} {}'.format(key, val))
-    log_config_to_file(cfg, logger=logger)
+    log_config_to_file(cfg, logger=logger) # logging cfg
     if cfg.LOCAL_RANK == 0:
         os.system('cp %s %s' % (args.cfg_file, output_dir))
 
@@ -108,7 +108,7 @@ def main():
         dist=dist_train, workers=args.workers,
         logger=logger,
         training=True,
-        merge_all_iters_to_one_epoch=args.merge_all_iters_to_one_epoch,
+        merge_all_iters_to_one_epoch=args.merge_all_iters_to_one_epoch, #default is False
         total_epochs=args.epochs
     )
 
