@@ -184,11 +184,11 @@ class KittiDataset(DatasetTemplate):
 
                 num_objects = len([obj.cls_type for obj in obj_list if obj.cls_type != 'DontCare'])
                 num_gt = len(annotations['name'])
-                index = list(range(num_objects)) + [-1] * (num_gt - num_objects)
+                index = list(range(num_objects)) + [-1] * (num_gt - num_objects) # [0, 1, 2, ... , -1, -1]
                 annotations['index'] = np.array(index, dtype=np.int32)
 
                 loc = annotations['location'][:num_objects] # except DontCare
-                dims = annotations['dimensions'][:num_objects] # except DontCare
+                dims = annotations['dimensions'][:num_objects] # e'dimxcept DontCare
                 rots = annotations['rotation_y'][:num_objects] # except DontCare
                 loc_lidar = calib.rect_to_lidar(loc)
                 l, h, w = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3]
@@ -253,9 +253,9 @@ class KittiDataset(DatasetTemplate):
                 filepath = database_save_path / filename
                 gt_points = points[point_indices[i] > 0]
 
-                gt_points[:, :3] -= gt_boxes[i, :3]
+                gt_points[:, :3] -= gt_boxes[i, :3] # x, y, z
                 with open(filepath, 'w') as f:
-                    gt_points.tofile(f)
+                    gt_points.tofile(f) # making *.bin file
 
                 if (used_classes is None) or names[i] in used_classes:
                     db_path = str(filepath.relative_to(self.root_path))  # gt_database/xxxxx.bin
@@ -372,12 +372,12 @@ class KittiDataset(DatasetTemplate):
         if self._merge_all_iters_to_one_epoch: # Default is 'False'
             index = index % len(self.kitti_infos)
 
-        info = copy.deepcopy(self.kitti_infos[index])
+        info = copy.deepcopy(self.kitti_infos[index]) # self.kiiti_infos : pkl file
 
         sample_idx = info['point_cloud']['lidar_idx'] # index (e.g. 000000)
         img_shape = info['image']['image_shape'] # e.g. array([ 370, 1224]
         calib = self.get_calib(sample_idx) # class regarding calibration
-        get_item_list = self.dataset_cfg.get('GET_ITEM_LIST', ['points']) # ['points']
+        get_item_list = self.dataset_cfg.get('', ['points']) # ['points'] # in cfgs/dataset_configs/kitti_dataset.yaml
 
         input_dict = {
             'frame_id': sample_idx,
@@ -390,7 +390,7 @@ class KittiDataset(DatasetTemplate):
             loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
             gt_names = annos['name']
             gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
-            gt_boxes_lidar = box_utils.boxes3d_kitti_camera_to_lidar(gt_boxes_camera, calib)
+            gt_boxes_lidar = box_utils.boxes3d_kitti_camera_to_lidar(gt_boxes_camera, calib) ###Check!!!!!!
 
             input_dict.update({
                 'gt_names': gt_names,

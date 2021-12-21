@@ -158,7 +158,7 @@ class DatasetTemplate(torch_data.Dataset):
         return data_dict
 
     @staticmethod
-    def collate_batch(batch_list, _unused=False):
+    def collate_batch(batch_list, _unused=False): # preprocessing for batchdata for each data type
         data_dict = defaultdict(list)
         for cur_sample in batch_list:
             for key, val in cur_sample.items():

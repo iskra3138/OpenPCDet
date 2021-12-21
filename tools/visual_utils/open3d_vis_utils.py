@@ -77,7 +77,7 @@ def translate_boxes_to_open3d_instance(gt_boxes):
     """
              4-------- 6
            /|         /|
-          5 -------- 3 .
+          5 -------- 3.
           | |        | |
           . 7 -------- 1
           |/         |/

@@ -5,7 +5,7 @@ def get_objects_from_label(label_file):
     with open(label_file, 'r') as f:
         lines = f.readlines()
     objects = [Object3d(line) for line in lines]
-    return objects
+    return objects # return parsed objects list
 
 
 def cls_type_to_id(cls_type):

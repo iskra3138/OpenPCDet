@@ -42,20 +42,20 @@ class DistributedSampler(_DistributedSampler):
 
 def build_dataloader(dataset_cfg, class_names, batch_size, dist, root_path=None, workers=4,
                      logger=None, training=True, merge_all_iters_to_one_epoch=False, total_epochs=0):
-
+    # XxxDataset Class in xxx_dataset.py
     dataset = __all__[dataset_cfg.DATASET](
         dataset_cfg=dataset_cfg,
-        class_names=class_names,
+        class_names=class_names, # e.g.: ['Car', 'Pedestrian', 'Cyclist']
         root_path=root_path,
         training=training,
         logger=logger,
     )
 
-    if merge_all_iters_to_one_epoch:
+    if merge_all_iters_to_one_epoch: # default 'False'
         assert hasattr(dataset, 'merge_all_iters_to_one_epoch')
         dataset.merge_all_iters_to_one_epoch(merge=True, epochs=total_epochs)
 
-    if dist:
+    if dist: # if distributed training
         if training:
             sampler = torch.utils.data.distributed.DistributedSampler(dataset)
         else:
@@ -63,6 +63,7 @@ def build_dataloader(dataset_cfg, class_names, batch_size, dist, root_path=None,
             sampler = DistributedSampler(dataset, world_size, rank, shuffle=False)
     else:
         sampler = None
+
     dataloader = DataLoader(
         dataset, batch_size=batch_size, pin_memory=True, num_workers=workers,
         shuffle=(sampler is None) and training, collate_fn=dataset.collate_batch,
