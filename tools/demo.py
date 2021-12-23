@@ -1,6 +1,7 @@
 import argparse
 import glob
 from pathlib import Path
+import laspy
 
 try:
     import open3d
@@ -46,6 +47,10 @@ class DemoDataset(DatasetTemplate):
     def __getitem__(self, index):
         if self.ext == '.bin':
             points = np.fromfile(self.sample_file_list[index], dtype=np.float32).reshape(-1, 4)
+        elif self.ext == '.las':
+            lasfile = laspy.file.File(self.sample_file_list[index], mode="r")
+            points = np.vstack((lasfile.x , lasfile.y
+                                 , lasfile.z-lasfile.z.min(), np.zeros_like(lasfile.x) )).transpose()
         elif self.ext == '.npy':
             points = np.load(self.sample_file_list[index])
         else:
