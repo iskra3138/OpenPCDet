@@ -120,17 +120,18 @@ class DatasetTemplate(torch_data.Dataset):
                 voxel_num_points: optional (num_voxels)
                 ...
         """
+        #print ("coming to preprocessing", data_dict['frame_id'])
         if self.training:
             assert 'gt_boxes' in data_dict, 'gt_boxes should be provided for training'
             gt_boxes_mask = np.array([n in self.class_names for n in data_dict['gt_names']], dtype=np.bool_)
-
+            #print ('000:', data_dict['frame_id'], data_dict['points'], gt_boxes_mask)
             data_dict = self.data_augmentor.forward(
                 data_dict={
                     **data_dict,
                     'gt_boxes_mask': gt_boxes_mask
                 }
             )
-
+        #print ('1st:',data_dict['frame_id'], data_dict['points'])
         if data_dict.get('gt_boxes', None) is not None:
             selected = common_utils.keep_arrays_by_name(data_dict['gt_names'], self.class_names)
             data_dict['gt_boxes'] = data_dict['gt_boxes'][selected]
@@ -141,7 +142,7 @@ class DatasetTemplate(torch_data.Dataset):
 
             if data_dict.get('gt_boxes2d', None) is not None:
                 data_dict['gt_boxes2d'] = data_dict['gt_boxes2d'][selected]
-
+        #print ('2nd:', data_dict['frame_id'], data_dict['points'])
         if 'timestamp' in self.dataset_cfg.POINT_FEATURE_ENCODING.get('src_feature_list'):
             if data_dict.get('points', None) is not None:
                 max_sweeps = self.dataset_cfg.get('MAX_SWEEPS', 1)
@@ -150,18 +151,18 @@ class DatasetTemplate(torch_data.Dataset):
                 if np.unique(dt).shape[0] == max_sweeps:
                     max_dt = sorted(np.unique(dt))[max_sweeps-1]
                     data_dict['points'] = data_dict['points'][dt <= max_dt]
-
+        #print ('3rd:', data_dict['frame_id'], data_dict['points'])
         if data_dict.get('points', None) is not None:
             data_dict = self.point_feature_encoder.forward(data_dict)
-
+        #print ('4th:', data_dict['frame_id'], data_dict['points'])
         data_dict = self.data_processor.forward(
             data_dict=data_dict
         )
-
+        #print ('5th:', data_dict['frame_id'], data_dict['points'])
         if self.training and len(data_dict['gt_boxes']) == 0:
             new_index = np.random.randint(self.__len__())
             return self.__getitem__(new_index)
-
+        #print ('6th:', data_dict['frame_id'], data_dict['points'])
         data_dict.pop('gt_names', None)
 
         return data_dict

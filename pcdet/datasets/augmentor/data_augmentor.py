@@ -43,6 +43,7 @@ class DataAugmentor(object):
     def random_world_flip(self, data_dict=None, config=None):
         if data_dict is None:
             return partial(self.random_world_flip, config=config)
+        #print ('random_world_flip',data_dict['frame_id'])
         gt_boxes, points = data_dict['gt_boxes'], data_dict['points']
         for cur_axis in config['ALONG_AXIS_LIST']:
             assert cur_axis in ['x', 'y']
@@ -55,6 +56,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_world_rotation(self, data_dict=None, config=None):
+        #print ('random_world_rotation',data_dict['frame_id'])
         if data_dict is None:
             return partial(self.random_world_rotation, config=config)
         rot_range = config['WORLD_ROT_ANGLE']
@@ -71,6 +73,7 @@ class DataAugmentor(object):
     def random_world_scaling(self, data_dict=None, config=None):
         if data_dict is None:
             return partial(self.random_world_scaling, config=config)
+        #print ('random_world_scaling',data_dict['frame_id'])
         gt_boxes, points = augmentor_utils.global_scaling(
             data_dict['gt_boxes'], data_dict['points'], config['WORLD_SCALE_RANGE']
         )
@@ -80,6 +83,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_image_flip(self, data_dict=None, config=None):
+        #print('random_image_flip',data_dict['frame_id'])
         if data_dict is None:
             return partial(self.random_image_flip, config=config)
         images = data_dict["images"]
@@ -99,6 +103,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_world_translation(self, data_dict=None, config=None):
+        #print ('random_world_translation',data_dict['frame_id'])
         """
         Please check the correctness of it before using.
         """
@@ -117,6 +122,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_local_translation(self, data_dict=None, config=None):
+        #print('random_local_translation',data_dict['frame_id'])
         """
         Please check the correctness of it before using.
         """
@@ -135,6 +141,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_local_rotation(self, data_dict=None, config=None):
+        #print ('random_local_rotation',data_dict['frame_id'])
         """
         Please check the correctness of it before using.
         """
@@ -152,6 +159,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_local_scaling(self, data_dict=None, config=None):
+        #print ('random_local_scaling',data_dict['frame_id'])
         """
         Please check the correctness of it before using.
         """
@@ -166,6 +174,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_world_frustum_dropout(self, data_dict=None, config=None):
+        #print ('random_world_frustum_dropout',data_dict['frame_id'])
         """
         Please check the correctness of it before using.
         """
@@ -185,6 +194,7 @@ class DataAugmentor(object):
         return data_dict
 
     def random_local_frustum_dropout(self, data_dict=None, config=None):
+        #print('random_local_frustum_dropout',data_dict['frame_id'] )
         """
         Please check the correctness of it before using.
         """
@@ -214,16 +224,21 @@ class DataAugmentor(object):
 
         Returns:
         """
+        #print ('coming_to_aug', data_dict['frame_id'])
+        #print (self.data_augmentor_queue)
         for cur_augmentor in self.data_augmentor_queue:
             data_dict = cur_augmentor(data_dict=data_dict)
-
+        #print ('aug111', data_dict['frame_id'], data_dict['points'])
         data_dict['gt_boxes'][:, 6] = common_utils.limit_period(
             data_dict['gt_boxes'][:, 6], offset=0.5, period=2 * np.pi
         )
+        #print ('aug222', data_dict['frame_id'], data_dict['points'])
         if 'calib' in data_dict:
             data_dict.pop('calib')
+        #print ('aug333', data_dict['frame_id'], data_dict['points'])
         if 'road_plane' in data_dict:
             data_dict.pop('road_plane')
+        #print ('aug444', data_dict['frame_id'], data_dict['points'])
         if 'gt_boxes_mask' in data_dict:
             gt_boxes_mask = data_dict['gt_boxes_mask']
             data_dict['gt_boxes'] = data_dict['gt_boxes'][gt_boxes_mask]
@@ -232,4 +247,5 @@ class DataAugmentor(object):
                 data_dict['gt_boxes2d'] = data_dict['gt_boxes2d'][gt_boxes_mask]
 
             data_dict.pop('gt_boxes_mask')
+        #print ('aug555', data_dict['frame_id'], data_dict['points'])
         return data_dict

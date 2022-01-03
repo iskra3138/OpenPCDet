@@ -5,7 +5,7 @@ DATA_CONFIG:
 
     DATA_PROCESSOR:
         -   NAME: mask_points_and_boxes_outside_range
-            REMOVE_OUTSIDE_BOXES: True
+            REMOVE_OUTSIDE_BOXES: False
 
         -   NAME: sample_points
             NUM_POINTS: {
@@ -138,7 +138,7 @@ MODEL:
 
 
 OPTIMIZATION:
-    BATCH_SIZE_PER_GPU: 1
+    BATCH_SIZE_PER_GPU: 8
     NUM_EPOCHS: 80
 
     OPTIMIZER: adam_onecycle

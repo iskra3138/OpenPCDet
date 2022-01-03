@@ -76,24 +76,32 @@ class DataProcessor(object):
             self.data_processor_queue.append(cur_processor)
 
     def mask_points_and_boxes_outside_range(self, data_dict=None, config=None):
+        #print ('mask_points_and_boxes_outside_range')
         if data_dict is None:
             return partial(self.mask_points_and_boxes_outside_range, config=config)
-
+        
+        points = data_dict['points']
+        #print (points)
+        #print (points[:,0].min(), points[:,0].max(), points[:,1].min(), points[:,1].max(), points[:,2].min(), points[:,2].max())
+        #print (len(data_dict['points']), end = ' -> ')
         if data_dict.get('points', None) is not None:
             mask = common_utils.mask_points_by_range(data_dict['points'], self.point_cloud_range)
             data_dict['points'] = data_dict['points'][mask]
-
+        #print (len(data_dict['points']), end = ' -> ')
         if data_dict.get('gt_boxes', None) is not None and config.REMOVE_OUTSIDE_BOXES and self.training:
             mask = box_utils.mask_boxes_outside_range_numpy(
                 data_dict['gt_boxes'], self.point_cloud_range, min_num_corners=config.get('min_num_corners', 1)
             )
             data_dict['gt_boxes'] = data_dict['gt_boxes'][mask]
+        #print (len(data_dict['points']))
+        #print (self.point_cloud_range)
         return data_dict
 
     def shuffle_points(self, data_dict=None, config=None):
+        #print ('shuffle_points')
         if data_dict is None:
             return partial(self.shuffle_points, config=config)
-
+        #print (len(data_dict['points']))
         if config.SHUFFLE_ENABLED[self.mode]:
             points = data_dict['points']
             shuffle_idx = np.random.permutation(points.shape[0])
@@ -103,6 +111,7 @@ class DataProcessor(object):
         return data_dict
 
     def transform_points_to_voxels(self, data_dict=None, config=None):
+        #print ('transform_points_to_voxels')
         if data_dict is None:
             grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
             self.grid_size = np.round(grid_size).astype(np.int64)
@@ -133,10 +142,12 @@ class DataProcessor(object):
         return data_dict
 
     def sample_points(self, data_dict=None, config=None):
+        #print ('coming to sample points')
         if data_dict is None:
             return partial(self.sample_points, config=config)
-
+        #print (data_dict['frame_id'], len(data_dict['points']))
         num_points = config.NUM_POINTS[self.mode]
+        #print ('num_points', num_points)
         if num_points == -1:
             return data_dict
 
@@ -158,10 +169,10 @@ class DataProcessor(object):
         else:
             choice = np.arange(0, len(points), dtype=np.int32)
             if num_points > len(points):
-                print (10*'\n')
-                print (data_dict)
-                print (num_points, len(points), choice.shape)
-                print (10*'\n')
+                #print (10*'\n')
+                #print ('sample_points', data_dict)
+                #print (len(points), choice.shape)
+                #print (10*'\n')
                 extra_choice = np.random.choice(choice, num_points - len(points), replace=False)
                 choice = np.concatenate((choice, extra_choice), axis=0)
             np.random.shuffle(choice)
@@ -169,6 +180,7 @@ class DataProcessor(object):
         return data_dict
 
     def calculate_grid_size(self, data_dict=None, config=None):
+        #print ('calculate_grid_size')
         if data_dict is None:
             grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
             self.grid_size = np.round(grid_size).astype(np.int64)
@@ -177,6 +189,7 @@ class DataProcessor(object):
         return data_dict
 
     def downsample_depth_map(self, data_dict=None, config=None):
+        #print ('downsample_depth_map')
         if data_dict is None:
             self.depth_downsample_factor = config.DOWNSAMPLE_FACTOR
             return partial(self.downsample_depth_map, config=config)

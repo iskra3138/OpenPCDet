@@ -2,7 +2,7 @@ CLASS_NAMES: ['tree']
 
 DATA_CONFIG: 
     _BASE_CONFIG_: cfgs/dataset_configs/tree_dataset.yaml
-    POINT_CLOUD_RANGE: [0.0, 0.0, 0.0, 60.0, 60.0, 32.0]
+    POINT_CLOUD_RANGE: [-30.0, -30.0, 0.0, 30.0, 30.0, 32.0]
     DATA_PROCESSOR:
         - NAME: mask_points_and_boxes_outside_range
           REMOVE_OUTSIDE_BOXES: True
@@ -14,7 +14,7 @@ DATA_CONFIG:
           }
 
         - NAME: transform_points_to_voxels
-          VOXEL_SIZE: [0.125, 0.125, 32]
+          VOXEL_SIZE: [0.25, 0.25, 32]
           MAX_POINTS_PER_VOXEL: 250
           MAX_NUMBER_OF_VOXELS: {
             'train': 20000,
@@ -26,11 +26,11 @@ DATA_CONFIG:
             - NAME: gt_sampling
               USE_ROAD_PLANE: False
               DB_INFO_PATH:
-                  - tree_dbinfos_train.pkl
+                - tree_dbinfos_train.pkl
               PREPARE: {
-                 filter_by_min_points: ['tree:10'],
-                 filter_by_difficulty: [-1],
-              }
+                filter_by_min_points: ['tree:10'],
+                filter_by_difficulty: [0],
+                }
 
               SAMPLE_GROUPS: ['tree:15']
               NUM_POINT_FEATURES: 3
@@ -39,7 +39,7 @@ DATA_CONFIG:
               LIMIT_WHOLE_SCENE: False
 
             - NAME: random_world_flip
-              ALONG_AXIS_LIST: ['x']
+              ALONG_AXIS_LIST: ['x','y']
 
             #- NAME: random_world_rotation
             #  WORLD_ROT_ANGLE: [-0.78539816, 0.78539816]
@@ -104,11 +104,11 @@ MODEL:
                 'cls_weight': 1.0,
                 'loc_weight': 2.0,
                 'dir_weight': 0,
-                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0]  ## 1.0
             }
 
     POST_PROCESSING:
-        RECALL_THRESH_LIST: [0.5, 0.7]
+        RECALL_THRESH_LIST: [0.7, 0.5]
         SCORE_THRESH: 0.3
         OUTPUT_RAW_SCORE: False
 
@@ -124,11 +124,11 @@ MODEL:
 
 OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4
-    NUM_EPOCHS: 80
+    NUM_EPOCHS: 200
 
     OPTIMIZER: adam_onecycle
-    LR: 0.003
-    WEIGHT_DECAY: 0.01
+    LR: 0.0001
+    WEIGHT_DECAY: 0.0001
     MOMENTUM: 0.9
 
     MOMS: [0.95, 0.85]

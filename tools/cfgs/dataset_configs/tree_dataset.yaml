@@ -1,7 +1,7 @@
 DATASET: 'TreeDataset'
 DATA_PATH: '../data/tree'
 
-POINT_CLOUD_RANGE: [0, 0, 0, 60, 60, 32]
+POINT_CLOUD_RANGE: [-30, -30, 0, 30, 30, 32]
 
 DATA_SPLIT: {
     'train': train,
@@ -22,23 +22,23 @@ DATA_AUGMENTOR:
         - NAME: gt_sampling
           USE_ROAD_PLANE: False
           DB_INFO_PATH:
-              - tree_dbinfos_train.pkl
+             - tree_dbinfos_train.pkl
           PREPARE: {
               filter_by_min_points: ['tree:1'],
-              filter_by_difficulty: [-1]
+              filter_by_difficulty: [0] # -1
           }
 
-          SAMPLE_GROUPS: ['tree:10']
+          SAMPLE_GROUPS: ['tree:20']
           NUM_POINT_FEATURES: 3
           DATABASE_WITH_FAKELIDAR: False
           REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
           LIMIT_WHOLE_SCENE: True
 
         - NAME: random_world_flip
-          ALONG_AXIS_LIST: ['x']
+          ALONG_AXIS_LIST: ['x', 'y']
 
-        - NAME: random_world_rotation
-          WORLD_ROT_ANGLE: [-0.78539816, 0.78539816]
+          #- NAME: random_world_rotation
+          #WORLD_ROT_ANGLE: [-0.78539816, 0.78539816]
 
         - NAME: random_world_scaling
           WORLD_SCALE_RANGE: [0.9, 1.1]

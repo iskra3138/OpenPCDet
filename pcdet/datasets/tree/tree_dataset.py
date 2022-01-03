@@ -42,7 +42,7 @@ class Object3d(object):  ## added for get_label
                                float(label[12]) - self.w/2,
                                float(label[11]) + self.l/2,
                                float(label[12]) + self.w/2), dtype=np.float32)
-        self.loc = np.array((float(label[11]), float(label[12]), float(label[13])-300), dtype=np.float32)
+        self.loc = np.array((float(label[11])-30, float(label[12])-30, float(label[13])-300), dtype=np.float32)
         #self.loc = np.array((float(label[11]), float(label[12]), float(label[13])-min_z), dtype=np.float32)
         #self.dis_to_cam = np.linalg.norm(self.loc) # we don't need this one
         self.ry = float(label[14])
@@ -51,13 +51,13 @@ class Object3d(object):  ## added for get_label
         self.level = self.get_tree_obj_level()
 
     def get_tree_obj_level(self): 
-        if self.occlusion < 0.4:
+        if self.occlusion > 0.8:
             self.level_str = 'Easy'
             return 0  # Easy
-        elif self.occlusion < 0.8:
+        elif self.occlusion > 0.2:
             self.level_str = 'Moderate'
             return 1  # Moderate
-        elif self.occlusion <= 1.0:
+        elif self.occlusion <= 0.2:
             self.level_str = 'Hard'
             return 2  # Hard
         else:
@@ -120,7 +120,7 @@ class TreeDataset(DatasetTemplate):
         lidar_file = self.root_split_path / 'velodyne' / ('T%s.las' % idx) ## chnaged
         assert lidar_file.exists()
         lasfile = laspy.file.File(lidar_file, mode="r") ## added
-        return np.vstack((lasfile.x , lasfile.y, lasfile.z-300)).transpose()
+        return np.vstack((lasfile.x-30 , lasfile.y-30, lasfile.z-300)).transpose().astype(np.float32)
         #return np.vstack((lasfile.x , lasfile.y, lasfile.z-lasfile.z.min())).transpose() ## changed to start z-value from 0
     ## Tree data is composed of only lidar. 
     ## so, we don't need any functions about image
@@ -325,7 +325,8 @@ class TreeDataset(DatasetTemplate):
 
                 gt_points[:, :3] -= gt_boxes[i, :3]
                 with open(filepath, 'w') as f:
-                    gt_points.tofile(f)  ## need to check where this file is used ##
+                    #gt_points.astype(np.float32).tofile(f)
+                    gt_points.tofile(f)  ## this file seems to be used for sampling augmentation ##
 
                 if (used_classes is None) or names[i] in used_classes:
                     db_path = str(filepath.relative_to(self.root_path))  # gt_database/xxxxx.bin
@@ -391,12 +392,14 @@ class TreeDataset(DatasetTemplate):
             pred_dict['alpha'] = -np.arctan2(-pred_boxes[:, 1], pred_boxes[:, 0]) + pred_boxes[:, 6]
             pred_dict['dimensions'] = pred_boxes[:, 3:6]
             pred_dict['location'] = pred_boxes[:, 0:3]
+            #pred_dict['rotation_y'] = np.zeros_like(pred_boxes[:, 6]) # set to 0.0, original code was pred_boxes[:, 6]
             pred_dict['rotation_y'] = pred_boxes[:, 6]
             pred_dict['score'] = pred_scores
             pred_dict['boxes_lidar'] = pred_boxes
 
+            # make order of bbox same to Object3d class
             pred_dict['bbox'][:,0] = pred_dict['location'][:, 0] - \
-                                     (pred_dict['dimensions'][:,0]/2)  #Change this to correct BIG BIg
+                                     (pred_dict['dimensions'][:,0]/2)  
             pred_dict['bbox'][:,1] = pred_dict['location'][:, 1] - \
                                      (pred_dict['dimensions'][:,1]/2)
             pred_dict['bbox'][:,2] = pred_dict['location'][:, 0] + \
@@ -479,6 +482,8 @@ class TreeDataset(DatasetTemplate):
                 'gt_names': gt_names,
                 'gt_boxes': gt_boxes_lidar
             })
+            #input_dict['gt_names'] = gt_names
+            #input_dict['gt_boxes'] = gt_boxes_lidar
             #if "gt_boxes2d" in get_item_list:
             #    input_dict['gt_boxes2d'] = annos["bbox"]
 
@@ -502,8 +507,13 @@ class TreeDataset(DatasetTemplate):
 
         #if "calib_matricies" in get_item_list:
         #    input_dict["trans_lidar_to_cam"], input_dict["trans_cam_to_img"] = kitti_utils.calib_to_matricies(calib)
-
+        #print ('11111111111\n', input_dict['frame_id'], input_dict['points'])
         data_dict = self.prepare_data(data_dict=input_dict)
+        #print ('after prepare_data', data_dict['frame_id'], data_dict['points'])
+        #print ('getitem:', data_dict)
+        #print (100 * '#')
+        #print ('getitem_name: ')
+        #print (data_dict['gt_names'])
 
         #data_dict['image_shape'] = img_shape
         return data_dict

@@ -70,6 +70,7 @@ def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scor
         vis = draw_box(vis, ref_boxes, (0, 1, 0), ref_labels, ref_scores)
 
     vis.run()
+    vis.capture_screen_image('/nas2/YJ/test.png')
     vis.destroy_window()
 
 
@@ -110,7 +111,7 @@ def draw_box(vis, gt_boxes, color=(0, 1, 0), ref_labels=None, score=None):
 
         vis.add_geometry(line_set)
 
-        # if score is not None:
+        #if score is not None:
         #     corners = box3d.get_box_points()
         #     vis.add_3d_label(corners[5], '%.2f' % score[i])
     return vis

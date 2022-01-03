@@ -14,7 +14,6 @@ except:
 
 import numpy as np
 import torch
-import os
 
 from pcdet.config import cfg, cfg_from_yaml_file
 from pcdet.datasets import DatasetTemplate
@@ -50,7 +49,7 @@ class DemoDataset(DatasetTemplate):
             points = np.fromfile(self.sample_file_list[index], dtype=np.float32).reshape(-1, 4)
         elif self.ext == '.las':
             lasfile = laspy.file.File(self.sample_file_list[index], mode="r")
-            points = np.vstack((lasfile.x-30 , lasfile.y-30
+            points = np.vstack((lasfile.x , lasfile.y
                                  , lasfile.z-300, np.zeros_like(lasfile.x) )).transpose()
         elif self.ext == '.npy':
             points = np.load(self.sample_file_list[index])
@@ -90,7 +89,6 @@ def main():
         dataset_cfg=cfg.DATA_CONFIG, class_names=cfg.CLASS_NAMES, training=False,
         root_path=Path(args.data_path), ext=args.ext, logger=logger
     )
-
     logger.info(f'Total number of samples: \t{len(demo_dataset)}')
 
     model = build_network(model_cfg=cfg.MODEL, num_class=len(cfg.CLASS_NAMES), dataset=demo_dataset)
@@ -103,7 +101,7 @@ def main():
             data_dict = demo_dataset.collate_batch([data_dict])
             load_data_to_gpu(data_dict)
             pred_dicts, _ = model.forward(data_dict)
-            print (pred_dicts)
+
             V.draw_scenes(
                 points=data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
                 ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
