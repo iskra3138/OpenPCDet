@@ -140,6 +140,8 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
     assert len(gt_annos) == len(dt_annos)
     total_dt_num = np.stack([len(a["name"]) for a in dt_annos], 0)
     total_gt_num = np.stack([len(a["name"]) for a in gt_annos], 0)
+    #print ('total_dt_num: ', total_dt_num)
+    #print ('total_gt_num: ', total_gt_num)
     num_examples = len(gt_annos)
     split_parts = get_split_parts(num_examples, num_parts)
     parted_overlaps = []
@@ -149,18 +151,18 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
         gt_annos_part = gt_annos[example_idx:example_idx + num_part]
         dt_annos_part = dt_annos[example_idx:example_idx + num_part]
         if metric == 0:
-            gt_boxes = np.concatenate([a["bbox"] for a in gt_annos_part], 0)
-            dt_boxes = np.concatenate([a["bbox"] for a in dt_annos_part], 0)
+            gt_boxes = np.concatenate([a["bbox"] for a in gt_annos_part if len(a['bbox'])!=0], 0)
+            dt_boxes = np.concatenate([a["bbox"] for a in dt_annos_part if len(a['bbox'])!=0], 0)
             overlap_part = image_box_overlap(gt_boxes, dt_boxes)
         elif metric == 1:
-            loc = np.concatenate([a["location"] for a in gt_annos_part], 0)
-            dims = np.concatenate([a["dimensions"] for a in gt_annos_part], 0)
-            rots = np.concatenate([a["rotation_y"] for a in gt_annos_part], 0)
+            loc = np.concatenate([a["location"] for a in gt_annos_part if len(a["location"]) !=0], 0)
+            dims = np.concatenate([a["dimensions"] for a in gt_annos_part if len(a["dimensions"]) !=0], 0)
+            rots = np.concatenate([a["rotation_y"] for a in gt_annos_part if len(a["rotation_y"]) !=0], 0)
             gt_boxes = np.concatenate(
                 [loc, dims, rots[..., np.newaxis]], axis=1)
-            loc = np.concatenate([a["location"] for a in dt_annos_part], 0)
-            dims = np.concatenate([a["dimensions"] for a in dt_annos_part], 0)
-            rots = np.concatenate([a["rotation_y"] for a in dt_annos_part], 0)
+            loc = np.concatenate([a["location"] for a in dt_annos_part if len(a["location"]) !=0], 0)
+            dims = np.concatenate([a["dimensions"] for a in dt_annos_part if len(a["dimensions"]) !=0], 0)
+            rots = np.concatenate([a["rotation_y"] for a in dt_annos_part  if len(a["rotation_y"]) !=0], 0)
             dt_boxes = np.concatenate(
                 [loc, dims, rots[..., np.newaxis]], axis=1)
             #overlap_part = d3_box_overlap(gt_boxes, dt_boxes).astype(np.float64)
@@ -188,7 +190,6 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
     return overlaps, total_gt_num, total_dt_num
 
 
-
 def print_str(value, *arg, sstream=None):
     if sstream is None:
         sstream = sysio.StringIO()
@@ -199,12 +200,12 @@ def print_str(value, *arg, sstream=None):
 
 
 def eval_class(gt_annos, dt_annos, metric, iou_th):
+    
     metric_names = ['BEV', '3d']
     case_name = '{}_{}'.format(metric_names[metric], iou_th)
-
-    overlaps, total_gt_num, total_dt_num = calculate_iou_partly(
-            gt_annos, dt_annos, metric, num_parts=100)
-
+    
+    overlaps, total_gt_num, total_dt_num = calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=100)
+    
     confidence = []
     tp = []
     fp = []
@@ -214,20 +215,16 @@ def eval_class(gt_annos, dt_annos, metric, iou_th):
         tp_per_file = np.zeros(num_dt_per_file)
         fp_per_file = np.ones(num_dt_per_file)
         dificulties_per_file = np.zeros(num_dt_per_file) - 1.
-        #print (i, num_gt_per_file, num_dt_per_file)
 
         gt_dificulties = gt_annos[i]['difficulty']
         gt_indices, dt_indices = np.where(overlap > iou_th)
         num_tp_per_file = len(dt_indices) 
 
-        if num_tp_per_file == 0 :
-            continue
-        else :
+        if num_tp_per_file != 0 :
             tp_per_file[dt_indices] = 1
             fp_per_file[dt_indices] = 0
             dificulties_per_file[dt_indices] = gt_dificulties[gt_indices]
 
-        #print (gt_annos[i]['difficulty'])
 
         conf_per_file = dt_annos[i]['score']
 
@@ -235,6 +232,7 @@ def eval_class(gt_annos, dt_annos, metric, iou_th):
         tp.append(tp_per_file)
         fp.append(fp_per_file)
         dificulties.append(dificulties_per_file)
+    
 
     confidence_fn = np.concatenate(confidence, axis=0)
     tp_fn = np.concatenate(tp, axis=0)
@@ -286,39 +284,129 @@ def eval_class(gt_annos, dt_annos, metric, iou_th):
     
     return result
 
+def normal_results(result, ret_dict, ret2d_dict, ret3d_dict, min_overlaps, cur_cls) :
+    
+    for i in range(len(min_overlaps)):
+        result += print_str(
+            (f"{cur_cls} "
+             "Results@{:.2f}:".format(min_overlaps[i])))
+        result += print_str((f"BEV AP: {ret2d_dict[cur_cls][i]['ap']:.4f}, "
+                             f"BEV precision: {ret2d_dict[cur_cls][i]['precision']:.4f} "
+                             f"BEV recall: {ret2d_dict[cur_cls][i]['recall']:.4f} "))
+        result += print_str((f"3d AP: {ret3d_dict[cur_cls][i]['ap']:.4f}, "
+                             f"3d precision: {ret3d_dict[cur_cls][i]['precision']:.4f} "
+                             f"3d recall: {ret3d_dict[cur_cls][i]['recall']:.4f} "
+                            ))
+
+        ret_dict['{}_BEV/iou_{}_AP'.format(cur_cls, min_overlaps[i])] = ret2d_dict[cur_cls][i]['ap']
+        ret_dict['{}_BEV/iou_{}_precision'.format(cur_cls, min_overlaps[i])] = ret2d_dict[cur_cls][i]['precision']
+        ret_dict['{}_BEV/iou_{}_recall'.format(cur_cls, min_overlaps[i])] = ret2d_dict[cur_cls][i]['recall']
+
+        ret_dict['{}_3D/iou_{}_AP'.format(cur_cls, min_overlaps[i])] = ret3d_dict[cur_cls][i]['ap']
+        ret_dict['{}_3D/iou_{}_precision'.format(cur_cls, min_overlaps[i])] = ret3d_dict[cur_cls][i]['precision']
+        ret_dict['{}_3D/iou_{}_recall'.format(cur_cls, min_overlaps[i])] = ret3d_dict[cur_cls][i]['recall']
+    
+    return result, ret_dict
+
+def no_gt_results(result, ret_dict, min_overlaps, cur_cls) :
+
+    for i in range(len(min_overlaps)):
+        result += print_str(
+            (f"{cur_cls} "
+             "Results@{:.2f}:".format(min_overlaps[i])))
+        result += print_str((f"BEV AP: there is no GT "
+                             f"BEV precision: there is no GT "
+                             f"BEV recall: there is no GT "))
+        result += print_str((f"3d AP: there is no GT "
+                             f"3d precision: there is no GT "
+                             f"3d recall: there is no GT "
+                            ))
+
+        ret_dict['{}_BEV/iou_{}_AP'.format(cur_cls, min_overlaps[i])] = "there is no GT"
+        ret_dict['{}_BEV/iou_{}_precision'.format(cur_cls, min_overlaps[i])] = "there is no GT"
+        ret_dict['{}_BEV/iou_{}_recall'.format(cur_cls, min_overlaps[i])] = "there is no GT"
+
+        ret_dict['{}_3D/iou_{}_AP'.format(cur_cls, min_overlaps[i])] = "there is no GT"
+        ret_dict['{}_3D/iou_{}_precision'.format(cur_cls, min_overlaps[i])] = "there is no GT"
+        ret_dict['{}_3D/iou_{}_recall'.format(cur_cls, min_overlaps[i])] = "there is no GT"
+
+    return result, ret_dict
+
+def no_preds_results(result, ret_dict, min_overlaps, cur_cls) :
+
+    for i in range(len(min_overlaps)):
+        result += print_str(
+            (f"{cur_cls} "
+             "Results@{:.2f}:".format(min_overlaps[i])))
+        result += print_str((f"BEV AP: {0.0:.1f}, "
+                             f"BEV precision: {0.0:.1f} "
+                             f"BEV recall: {0.0:.4f} "))
+        result += print_str((f"3d AP: {0.0:.4f}, "
+                             f"3d precision: {0.0:.4f} "
+                             f"3d recall: {0.0:.4f} "
+                            ))
+
+        ret_dict['{}_BEV/iou_{}_AP'.format(cur_cls, min_overlaps[i])] = 0.0
+        ret_dict['{}_BEV/iou_{}_precision'.format(cur_cls, min_overlaps[i])] = 0.0
+        ret_dict['{}_BEV/iou_{}_recall'.format(cur_cls, min_overlaps[i])] = 0.0
+
+        ret_dict['{}_3D/iou_{}_AP'.format(cur_cls, min_overlaps[i])] = 0.0
+        ret_dict['{}_3D/iou_{}_precision'.format(cur_cls, min_overlaps[i])] = 0.0
+        ret_dict['{}_3D/iou_{}_recall'.format(cur_cls, min_overlaps[i])] = 0.0
+
+    return result, ret_dict
+
 
 def get_tree_eval_result(gt_annos, dt_annos, current_classes, PR_detail_dict=None):
 
     min_overlaps = [0.3, 0.5, 0.7]
 
-    ret_2d = [] # For 2d BEV results
-    ret_3d = [] # For 3d results
-    for min_overlap in min_overlaps :
-        iou_th = min_overlap
-        ret_2d.append(eval_class(gt_annos, dt_annos, 0, iou_th))
-        ret_3d.append(eval_class(gt_annos, dt_annos, 1, iou_th))
+    ret2d_dict = {}
+    ret3d_dict = {}
+    ret_dict = {}
 
     result = '\n'
-    for i in range(len(min_overlaps)):
-        result += print_str(
-            (f"{'tree'} "
-             "Results@{:.2f}:".format(min_overlaps[i])))
-        result += print_str((f"BEV AP: {ret_2d[i]['ap']:.4f}, "
-                             f"BEV precision: {ret_2d[i]['precision']:.4f} "
-                             f"BEV recall: {ret_2d[i]['recall']:.4f} "))
-        result += print_str((f"3d AP: {ret_3d[i]['ap']:.4f}, "
-                             f"3d precision: {ret_3d[i]['precision']:.4f} "
-                             f"3d recall: {ret_3d[i]['recall']:.4f} "
-                            ))
 
-    ret_dict = {}
-    for i in range(len(min_overlaps)):
-        ret_dict['{}_BEV/iou_{}_AP'.format('tree', min_overlaps[i])] = ret_2d[i]['ap']
-        ret_dict['{}_BEV/iou_{}_precision'.format('tree', min_overlaps[i])] = ret_2d[i]['precision']
-        ret_dict['{}_BEV/iou_{}_recall'.format('tree', min_overlaps[i])] = ret_2d[i]['recall']
+    for cur_cls in current_classes : 
+        gt_annos_cls = []
+        total_gt_num = 0
+        for gt_anno in gt_annos : 
+            index = np.where(gt_anno['name'] == cur_cls)
+            total_gt_num += index[0].shape[0]
+            gt_anno_cls = {}
+            for k, v in gt_anno.items() :
+                gt_anno_cls[k] = v[index]
+            gt_annos_cls.append(gt_anno_cls)
 
-        ret_dict['{}_3D/iou_{}_AP'.format('tree', min_overlaps[i])] = ret_3d[i]['ap']
-        ret_dict['{}_3D/iou_{}_precision'.format('tree', min_overlaps[i])] = ret_3d[i]['precision']
-        ret_dict['{}_3D/iou_{}_recall'.format('tree', min_overlaps[i])] = ret_3d[i]['recall']
+        dt_annos_cls = []
+        total_dt_num = 0
+        for dt_anno in dt_annos : 
+            index = np.where(dt_anno['name'].astype(str) == cur_cls)
+            total_dt_num += index[0].shape[0]
+            dt_anno_cls = {}
+            for k, v in dt_anno.items() :
+                if k != 'frame_id' :
+                    dt_anno_cls[k] = v[index]
+                else :
+                    dt_anno_cls[k] = v
+            dt_annos_cls.append(dt_anno_cls)            
 
-    return result, ret_2d, ret_3d, ret_dict
+        if total_gt_num !=0 and total_dt_num != 0 :
+            ret2d = [] # For 2d BEV results
+            ret3d = [] # For 3d results
+            for min_overlap in min_overlaps :
+                iou_th = min_overlap
+                ret2d.append(eval_class(gt_annos_cls, dt_annos_cls, 0, iou_th))
+                ret3d.append(eval_class(gt_annos_cls, dt_annos_cls, 1, iou_th))
+            ret2d_dict[cur_cls] = ret2d
+            ret3d_dict[cur_cls] = ret3d
+
+            result, ret_dict = normal_results(result, ret_dict, ret2d_dict, ret3d_dict, min_overlaps, cur_cls)
+
+        elif total_gt_num == 0  :
+            result, ret_dict = no_gt_results(result, ret_dict, min_overlaps, cur_cls)
+
+        else :
+            result, ret_dict = no_preds_results(result, ret_dict, min_overlaps, cur_cls)
+
+    return result, ret_dict

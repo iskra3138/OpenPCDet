@@ -442,11 +442,11 @@ class TreeDataset(DatasetTemplate):
         eval_det_annos = copy.deepcopy(det_annos)
         eval_gt_annos = [copy.deepcopy(info['annos']) for info in self.tree_infos] ## changed
 
-        ap_result_str, ret_2d, ret_3d, ap_dict = tree_eval.get_tree_eval_result(eval_gt_annos, eval_det_annos, class_names) ## changed
-        with open('2d_results.pkl', 'wb') as f:
-            gt_annos = pickle.dump(ret_2d, f)
-        with open('3d_results.pkl', 'wb') as f:
-            dt_annos = pickle.dump(ret_3d, f)   
+        #with open('gt_annos.pkl', 'wb') as f:
+        #    gt_annos = pickle.dump(eval_gt_annos, f)
+        #with open('dt_annos.pkl', 'wb') as f:
+        #    dt_annos = pickle.dump(eval_det_annos, f)
+        ap_result_str, ap_dict = tree_eval.get_tree_eval_result(eval_gt_annos, eval_det_annos, class_names) ## changed
         
         return ap_result_str, ap_dict
 
