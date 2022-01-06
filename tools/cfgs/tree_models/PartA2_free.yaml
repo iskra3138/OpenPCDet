@@ -1,7 +1,7 @@
-CLASS_NAMES: ['Car', 'Pedestrian', 'Cyclist']
+CLASS_NAMES: ['tree']
 
 DATA_CONFIG:
-    _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
+    _BASE_CONFIG_: cfgs/dataset_configs/tree_dataset.yaml
 
 
 MODEL:
@@ -27,9 +27,9 @@ MODEL:
             BOX_CODER_CONFIG: {
                 'use_mean_size': True,
                 'mean_size': [
-                    [3.9, 1.6, 1.56],
-                    [0.8, 0.6, 1.73],
-                    [1.76, 0.6, 1.73]
+                    [3., 3., 5.] # [3.9, 1.6, 1.56],
+                    #[0.8, 0.6, 1.73],
+                    #[1.76, 0.6, 1.73]
                 ]
             }
 
@@ -95,7 +95,7 @@ MODEL:
                 'rcnn_cls_weight': 1.0,
                 'rcnn_reg_weight': 1.0,
                 'rcnn_corner_weight': 1.0,
-                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0] #[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
             }
 
     POST_PROCESSING:
@@ -115,7 +115,7 @@ MODEL:
 
 OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4
-    NUM_EPOCHS: 80
+    NUM_EPOCHS: 200
 
     OPTIMIZER: adam_onecycle
     LR: 0.003
@@ -125,7 +125,7 @@ OPTIMIZATION:
     MOMS: [0.95, 0.85]
     PCT_START: 0.4
     DIV_FACTOR: 10
-    DECAY_STEP_LIST: [35, 45]
+    DECAY_STEP_LIST: [75, 115] #[35, 45]
     LR_DECAY: 0.1
     LR_CLIP: 0.0000001
 

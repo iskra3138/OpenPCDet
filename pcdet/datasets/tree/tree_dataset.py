@@ -33,19 +33,17 @@ class Object3d(object):  ## added for get_label
         self.cls_id = cls_type_to_id(self.cls_type)
         self.truncation = float(label[1]) # 0: non-truncated, 1: truncated
         self.occlusion = float(label[2])  # the float number of 'ground points' / 'total number of points within a 5 m buffer'
-        self.alpha = 0.0 # we don't need this one
-        #self.box2d = np.array((0.0, 0.0, 50.0, 50.0), dtype=np.float32) # we don't need this one
+        self.alpha = 0.0 # set to zero, we don't need this one
         self.h = float(label[8])
         self.w = float(label[10])
         self.l = float(label[9])
-        self.box2d = np.array((float(label[11]) - self.l/2 ,
-                               float(label[12]) - self.w/2,
-                               float(label[11]) + self.l/2,
-                               float(label[12]) + self.w/2), dtype=np.float32)
-        self.loc = np.array((float(label[11])-30, float(label[12])-30, float(label[13])-300), dtype=np.float32)
-        #self.loc = np.array((float(label[11]), float(label[12]), float(label[13])-min_z), dtype=np.float32)
+        self.loc = np.array((float(label[11])-30, float(label[12])-30, float(label[13])-300), dtype=np.float32) # for flip augmentation along x,y-axis
+        self.box2d = np.array((self.loc[0] - self.l/2 ,
+                               self.loc[1] - self.w/2,
+                               self.loc[0] + self.l/2,
+                               self.loc[1] + self.w/2), dtype=np.float32)
         #self.dis_to_cam = np.linalg.norm(self.loc) # we don't need this one
-        self.ry = float(label[14])
+        self.ry = 0.0 # set to zero, ## float(label[14])
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
         self.level_str = None
         self.level = self.get_tree_obj_level()
@@ -246,7 +244,7 @@ class TreeDataset(DatasetTemplate):
                 annotations['occluded'] = np.array([obj.occlusion for obj in obj_list])
                 annotations['alpha'] = np.array([obj.alpha for obj in obj_list]) # all is 0
                 annotations['bbox'] = np.concatenate([obj.box2d.reshape(1, 4) for obj in obj_list], axis=0)
-                annotations['dimensions'] = np.array([[obj.l, obj.h, obj.w] for obj in obj_list])
+                annotations['dimensions'] = np.array([[obj.l, obj.w, obj.h] for obj in obj_list]) # lwh(lidar) format
                 annotations['location'] = np.concatenate([obj.loc.reshape(1, 3) for obj in obj_list], axis=0)
                 annotations['rotation_y'] = np.array([obj.ry for obj in obj_list])
                 annotations['score'] = np.array([obj.score for obj in obj_list])
@@ -261,7 +259,7 @@ class TreeDataset(DatasetTemplate):
                 dims = annotations['dimensions'][:num_objects]
                 rots = annotations['rotation_y'][:num_objects]
                 #loc_lidar = calib.rect_to_lidar(loc)
-                l, h, w = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3]
+                l, w, h = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3] # Changed!!!! for lwh format
                 #loc_lidar[:, 2] += h[:, 0] / 2
                 gt_boxes_lidar = np.concatenate([loc, l, w, h, rots[..., np.newaxis]], axis=1) # changed
                 annotations['gt_boxes_lidar'] = gt_boxes_lidar
@@ -389,13 +387,14 @@ class TreeDataset(DatasetTemplate):
             #)
             
             pred_dict['name'] = np.array(class_names)[pred_labels - 1]
-            pred_dict['alpha'] = -np.arctan2(-pred_boxes[:, 1], pred_boxes[:, 0]) + pred_boxes[:, 6]
+            pred_dict['alpha'] = np.zeros_like(pred_boxes[:, 6]) #-np.arctan2(-pred_boxes[:, 1], pred_boxes[:, 0]) + pred_boxes[:, 6]
             pred_dict['dimensions'] = pred_boxes[:, 3:6]
             pred_dict['location'] = pred_boxes[:, 0:3]
-            #pred_dict['rotation_y'] = np.zeros_like(pred_boxes[:, 6]) # set to 0.0, original code was pred_boxes[:, 6]
-            pred_dict['rotation_y'] = pred_boxes[:, 6]
+            pred_dict['rotation_y'] = np.zeros_like(pred_boxes[:, 6]) # set to 0.0, original code was pred_boxes[:, 6]
+            #pred_dict['rotation_y'] = pred_boxes[:, 6]
             pred_dict['score'] = pred_scores
             pred_dict['boxes_lidar'] = pred_boxes
+            pred_dict['boxes_lidar'][:, 6] = 0.0 # changed
 
             # make order of bbox same to Object3d class
             pred_dict['bbox'][:,0] = pred_dict['location'][:, 0] - \
@@ -422,7 +421,7 @@ class TreeDataset(DatasetTemplate):
                 with open(cur_det_file, 'w') as f:
                     bbox = single_pred_dict['bbox']
                     loc = single_pred_dict['location']
-                    dims = single_pred_dict['dimensions']  # lhw -> hwl
+                    dims = single_pred_dict['dimensions']  # lwh
 
                     for idx in range(len(bbox)):
                         print('%s -1 -1 %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f'
@@ -438,12 +437,17 @@ class TreeDataset(DatasetTemplate):
         if 'annos' not in self.tree_infos[0].keys(): ## changed
             return None, {}
 
-        from .tree_object_eval_python import eval as tree_eval ## changed
+        from .tree_object_eval_python import eval_tree as tree_eval ## changed
 
         eval_det_annos = copy.deepcopy(det_annos)
         eval_gt_annos = [copy.deepcopy(info['annos']) for info in self.tree_infos] ## changed
-        ap_result_str, ap_dict = tree_eval.get_official_eval_result(eval_gt_annos, eval_det_annos, class_names) ## changed
 
+        ap_result_str, ret_2d, ret_3d, ap_dict = tree_eval.get_tree_eval_result(eval_gt_annos, eval_det_annos, class_names) ## changed
+        with open('2d_results.pkl', 'wb') as f:
+            gt_annos = pickle.dump(ret_2d, f)
+        with open('3d_results.pkl', 'wb') as f:
+            dt_annos = pickle.dump(ret_3d, f)   
+        
         return ap_result_str, ap_dict
 
     def __len__(self):

@@ -127,9 +127,15 @@ class VoxelRCNNHead(RoIHeadTemplate):
         roi_grid_xyz = roi_grid_xyz.view(batch_size, -1, 3)  
 
         # compute the voxel coordinates of grid points
-        roi_grid_coords_x = (roi_grid_xyz[:, :, 0:1] - self.point_cloud_range[0]) // self.voxel_size[0]
-        roi_grid_coords_y = (roi_grid_xyz[:, :, 1:2] - self.point_cloud_range[1]) // self.voxel_size[1]
-        roi_grid_coords_z = (roi_grid_xyz[:, :, 2:3] - self.point_cloud_range[2]) // self.voxel_size[2]
+        roi_grid_coords_x = torch.div((roi_grid_xyz[:, :, 0:1] - self.point_cloud_range[0]), 
+                self.voxel_size[0], rounding_mode='floor')
+        roi_grid_coords_y = torch.div((roi_grid_xyz[:, :, 1:2] - self.point_cloud_range[1]),
+                self.voxel_size[1], rounding_mode='floor')
+        roi_grid_coords_z = torch.div((roi_grid_xyz[:, :, 2:3] - self.point_cloud_range[2]),
+                self.voxel_size[2], rounding_mode='floor')
+        #roi_grid_coords_x = (roi_grid_xyz[:, :, 0:1] - self.point_cloud_range[0]) // self.voxel_size[0]
+        #roi_grid_coords_y = (roi_grid_xyz[:, :, 1:2] - self.point_cloud_range[1]) // self.voxel_size[1]
+        #roi_grid_coords_z = (roi_grid_xyz[:, :, 2:3] - self.point_cloud_range[2]) // self.voxel_size[2]
         # roi_grid_coords: (B, Nx6x6x6, 3)
         roi_grid_coords = torch.cat([roi_grid_coords_x, roi_grid_coords_y, roi_grid_coords_z], dim=-1)
 
@@ -166,7 +172,8 @@ class VoxelRCNNHead(RoIHeadTemplate):
             # get voxel2point tensor
             v2p_ind_tensor = common_utils.generate_voxel2pinds(cur_sp_tensors)
             # compute the grid coordinates in this scale, in [batch_idx, x y z] order
-            cur_roi_grid_coords = roi_grid_coords // cur_stride
+            cur_roi_grid_coords = torch.div(roi_grid_coords, cur_stride, rounding_mode='floor')
+            #cur_roi_grid_coords = roi_grid_coords // cur_stride
             cur_roi_grid_coords = torch.cat([batch_idx, cur_roi_grid_coords], dim=-1)
             cur_roi_grid_coords = cur_roi_grid_coords.int()
             # voxel neighbor aggregation
