@@ -29,10 +29,10 @@ MODEL:
         NAME: AnchorHeadMulti
         CLASS_AGNOSTIC: False
 
-        USE_DIRECTION_CLASSIFIER: False #True
-        DIR_OFFSET: 0.0 #0.78539
+        USE_DIRECTION_CLASSIFIER: True
+        DIR_OFFSET: 0.78539
         DIR_LIMIT_OFFSET: 0.0
-        NUM_DIR_BINS: 1 #2
+        NUM_DIR_BINS: 2
         
         USE_MULTIHEAD: True
         SEPARATE_MULTIHEAD: True
