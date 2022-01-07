@@ -131,14 +131,14 @@ class DemoDataset(DatasetTemplate):
         
 
         input_dict = {
-                'points': points[:,:3],
+            'points': points[:,:3],
             'frame_id': index,
             'gt_boxes': gt_boxes_lidar,
             'gt_names': annotations['name']
         }
-        print ('first: ', input_dict['points'].shape)
+        #print ('first: ', input_dict['points'].shape)
         data_dict = self.prepare_data(data_dict=input_dict)
-        print ('second: ', data_dict['points'].shape)
+        #print ('second: ', data_dict['points'].shape)
 
         return data_dict
 
@@ -150,7 +150,7 @@ def parse_config():
     parser.add_argument('--data_path', type=str, default='demo_data',
                         help='specify the point cloud data file or directory')
     parser.add_argument('--ckpt', type=str, default=None, help='specify the pretrained model')
-    parser.add_argument('--ext', type=str, default='.bin', help='specify the extension of your point cloud data file')
+    parser.add_argument('--ext', type=str, default='.las', help='specify the extension of your point cloud data file')
 
     args = parser.parse_args()
 
@@ -178,13 +178,13 @@ def main():
         for idx, data_dict in enumerate(demo_dataset):
             logger.info(f'Visualized sample index: \t{idx + 1}')
             data_dict = demo_dataset.collate_batch([data_dict])
-            print (data_dict['gt_boxes'], data_dict['gt_boxes'].shape, data_dict['points'].shape)
+            #print (data_dict['gt_boxes'], data_dict['gt_boxes'].shape, data_dict['points'].shape)
             #print (data_dict['points'][:,1:])
             pts = data_dict['points'][:,1:]
-            print (pts[:,0].min(), pts[:,0].max(), pts[:,1].min(), pts[:,1].max(), pts[:,2].min(), pts[:,2].max())
+            #print (pts[:,0].min(), pts[:,0].max(), pts[:,1].min(), pts[:,1].max(), pts[:,2].min(), pts[:,2].max())
             load_data_to_gpu(data_dict)
             pred_dicts, _ = model.forward(data_dict)
-            print (pred_dicts)
+            #print (pred_dicts)
             V.draw_scenes(
                 points=data_dict['points'][:, 1:], gt_boxes=data_dict['gt_boxes'][0], ref_boxes=pred_dicts[0]['pred_boxes'],
                 ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']

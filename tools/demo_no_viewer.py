@@ -3,15 +3,6 @@ import glob
 from pathlib import Path
 import laspy
 
-try:
-    import open3d
-    from visual_utils import open3d_vis_utils as V
-    OPEN3D_FLAG = True
-except:
-    import mayavi.mlab as mlab
-    from visual_utils import visualize_utils as V
-    OPEN3D_FLAG = False
-
 import numpy as np
 import torch
 import os
@@ -131,14 +122,14 @@ class DemoDataset(DatasetTemplate):
         
 
         input_dict = {
-                'points': points[:,:3],
+            'points': points[:,:3],
             'frame_id': index,
             'gt_boxes': gt_boxes_lidar,
             'gt_names': annotations['name']
         }
-        #print ('first: ', input_dict['points'].shape)
+        print ('Points shape before_prepare_data: ', input_dict['points'].shape)
         data_dict = self.prepare_data(data_dict=input_dict)
-        #print ('second: ', data_dict['points'].shape)
+        print ('Points shape after_prepare_data: ', data_dict['points'].shape)
 
         return data_dict
 
@@ -176,22 +167,31 @@ def main():
     model.eval()
     with torch.no_grad():
         for idx, data_dict in enumerate(demo_dataset):
-            logger.info(f'Visualized sample index: \t{idx + 1}')
+            #logger.info(f'Visualized sample index: \t{idx + 1}')
             data_dict = demo_dataset.collate_batch([data_dict])
-            #print (data_dict['gt_boxes'], data_dict['gt_boxes'].shape, data_dict['points'].shape)
             #print (data_dict['points'][:,1:])
             pts = data_dict['points'][:,1:]
-            #print (pts[:,0].min(), pts[:,0].max(), pts[:,1].min(), pts[:,1].max(), pts[:,2].min(), pts[:,2].max())
+            print ("POINT CLOUD RANGE: [{:.2f} {:.2f} {:.2f} {:.2f} {:.2f} {:.2f}]".format(
+                pts[:,0].min(), pts[:,0].max(), pts[:,1].min(), pts[:,1].max(), pts[:,2].min(), pts[:,2].max()))
+
             load_data_to_gpu(data_dict)
             pred_dicts, _ = model.forward(data_dict)
-            #print (pred_dicts)
-            V.draw_scenes(
-                points=data_dict['points'][:, 1:], gt_boxes=data_dict['gt_boxes'][0], ref_boxes=pred_dicts[0]['pred_boxes'],
-                ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
-            )
+            print (100 * '#')
+            print ('Prediction Results')
+            for pred_dict in pred_dicts :
+                for k, v in pred_dict.items() :
+                    print (k, v.cpu())
 
-            if not OPEN3D_FLAG:
-                mlab.show(stop=True)
+            print (100 * '#')
+            print ('GT BBoes')
+            print (data_dict['gt_boxes'][0][:,:7].cpu())
+            #V.draw_scenes(
+            #    points=data_dict['points'][:, 1:], gt_boxes=data_dict['gt_boxes'][0], ref_boxes=pred_dicts[0]['pred_boxes'],
+            #    ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
+            #)
+
+            #if not OPEN3D_FLAG:
+            #    mlab.show(stop=True)
 
     logger.info('Demo done.')
 
