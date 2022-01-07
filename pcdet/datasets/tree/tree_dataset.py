@@ -552,7 +552,7 @@ def create_tree_infos(dataset_cfg, class_names, data_path, save_path, workers=4)
     print('Tree info trainval file is saved to %s' % trainval_filename) ## changed
 
     dataset.set_split('test')
-    tree_infos_test = dataset.get_infos(num_workers=workers, has_label=False, count_inside_pts=False) ## changed
+    tree_infos_test = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=True) ## changed for getting results over testset
     with open(test_filename, 'wb') as f:
         pickle.dump(tree_infos_test, f) ## changed
     print('Tree info test file is saved to %s' % test_filename) ## changed
