@@ -128,6 +128,24 @@ def get_split_parts(num, num_part):
         return [same_part] * num_part + [remain_num]
 
 
+def make_2d_bbox(annos, axis1='x', axis2='y'):
+    """ Make 2D BoundingBox such as BEV corresponding to given axises"""
+    axis_index = ['x', 'y', 'z']
+    ind1 = axis_index.index(axis1)
+    ind2 = axis_index.index(axis2)
+    
+    boxes = []
+    for a in annos :
+        if len(a['location'] !=0) :
+            box = np.zeros((a['location'].shape[0], 4))
+            box[:,0] = a['location'][:, ind1] - (a['dimensions'][:, ind1]/2)
+            box[:,1] = a['location'][:, ind2] - (a['dimensions'][:, ind2]/2)
+            box[:,2] = a['location'][:, ind1] + (a['dimensions'][:, ind1]/2)
+            box[:,3] = a['location'][:, ind2] + (a['dimensions'][:, ind2]/2)
+            boxes.append(box)
+    boxes = np.concatenate(boxes, 0)
+    return boxes
+
 def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
     """fast iou algorithm. this function can be used independently to
     do result analysis.
@@ -140,8 +158,6 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
     assert len(gt_annos) == len(dt_annos)
     total_dt_num = np.stack([len(a["name"]) for a in dt_annos], 0)
     total_gt_num = np.stack([len(a["name"]) for a in gt_annos], 0)
-    #print ('total_dt_num: ', total_dt_num)
-    #print ('total_gt_num: ', total_gt_num)
     num_examples = len(gt_annos)
     split_parts = get_split_parts(num_examples, num_parts)
     parted_overlaps = []
@@ -151,22 +167,14 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
         gt_annos_part = gt_annos[example_idx:example_idx + num_part]
         dt_annos_part = dt_annos[example_idx:example_idx + num_part]
         if metric == 0:
-            gt_boxes = np.concatenate([a["bbox"] for a in gt_annos_part if len(a['bbox'])!=0], 0)
-            dt_boxes = np.concatenate([a["bbox"] for a in dt_annos_part if len(a['bbox'])!=0], 0)
+            gt_boxes = make_2d_bbox(gt_annos_part, axis1='x', axis2='y')
+            dt_boxes = make_2d_bbox(dt_annos_part, axis1='x', axis2='y')
             overlap_part = image_box_overlap(gt_boxes, dt_boxes)
         elif metric == 1:
-            loc = np.concatenate([a["location"] for a in gt_annos_part if len(a["location"]) !=0], 0)
-            dims = np.concatenate([a["dimensions"] for a in gt_annos_part if len(a["dimensions"]) !=0], 0)
-            rots = np.concatenate([a["rotation_y"] for a in gt_annos_part if len(a["rotation_y"]) !=0], 0)
-            gt_boxes = np.concatenate(
-                [loc, dims, rots[..., np.newaxis]], axis=1)
-            loc = np.concatenate([a["location"] for a in dt_annos_part if len(a["location"]) !=0], 0)
-            dims = np.concatenate([a["dimensions"] for a in dt_annos_part if len(a["dimensions"]) !=0], 0)
-            rots = np.concatenate([a["rotation_y"] for a in dt_annos_part  if len(a["rotation_y"]) !=0], 0)
-            dt_boxes = np.concatenate(
-                [loc, dims, rots[..., np.newaxis]], axis=1)
-            #overlap_part = d3_box_overlap(gt_boxes, dt_boxes).astype(np.float64)
-            overlap_part = boxes_iou3d_gpu(gt_boxes, dt_boxes).astype(np.float64)
+            gt_boxes = np.concatenate([a["gt_boxes_lidar"] for a in gt_annos_part if len(a["gt_boxes_lidar"]) !=0], 0)
+            dt_boxes = np.concatenate([a["boxes_lidar"] for a in dt_annos_part if len(a["boxes_lidar"]) !=0], 0)
+            overlap_part = d3_box_overlap(gt_boxes, dt_boxes).astype(np.float64)
+            #overlap_part = boxes_iou3d_gpu(gt_boxes, dt_boxes).astype(np.float64)
         else:
             raise ValueError("unknown metric")
         parted_overlaps.append(overlap_part)

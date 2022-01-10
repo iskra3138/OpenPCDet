@@ -5,44 +5,35 @@ import laspy
 import numpy as np
 from skimage import io
 
-#from . import kitti_utils
 from ...ops.roiaware_pool3d import roiaware_pool3d_utils
-from ...utils import box_utils, calibration_kitti, common_utils # object3d_kitti 
+from ...utils import box_utils #, common_utils # object3d_kitti 
 from ..dataset import DatasetTemplate
 
-#def get_objects_from_label(label_file, min_z): ## added for get_label
 def get_objects_from_label(label_file): ## added for get_label
     with open(label_file, 'r') as f:
         lines = f.readlines()
     objects = [Object3d(line) for line in lines]
-    #objects = [Object3d(line, min_z) for line in lines]
-    return objects # return parsed objects list
+    return objects
 
 def cls_type_to_id(cls_type):
-    type_to_id = {'tree': 1}
+    type_to_id = {'tree': 1} # changed
     if cls_type not in type_to_id.keys():
         return -1
     return type_to_id[cls_type]
 
 class Object3d(object):  ## added for get_label
     def __init__(self, line):
-    #def __init__(self, line, min_z):    
         label = line.strip().split(' ')
         self.src = line
         self.cls_type = label[0]
         self.cls_id = cls_type_to_id(self.cls_type)
         self.truncation = float(label[1]) # 0: non-truncated, 1: truncated
         self.occlusion = float(label[2])  # the float number of 'ground points' / 'total number of points within a 5 m buffer'
-        self.alpha = 0.0 # set to zero, we don't need this one
+        #self.alpha = 0.0 # set to zero, we don't need this one
         self.h = float(label[8])
         self.w = float(label[10])
         self.l = float(label[9])
-        self.loc = np.array((float(label[11])-30, float(label[12])-30, float(label[13])-300), dtype=np.float32) # for flip augmentation along x,y-axis
-        self.box2d = np.array((self.loc[0] - self.l/2 ,
-                               self.loc[1] - self.w/2,
-                               self.loc[0] + self.l/2,
-                               self.loc[1] + self.w/2), dtype=np.float32)
-        #self.dis_to_cam = np.linalg.norm(self.loc) # we don't need this one
+        self.loc = np.array((float(label[11])-30, float(label[12])-30, float(label[13])-300), dtype=np.float32) # for flip augmentation along x,y-axis (only for 60*60 tiles)
         self.ry = 0.0 # set to zero, ## float(label[14])
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
         self.level_str = None
@@ -113,106 +104,17 @@ class TreeDataset(DatasetTemplate):
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None # list of file_names
 
     def get_lidar(self, idx):
-        # I made z-value start to zero for a kind of normalization.
-        # So, z-value of label.txt should be modified on the get_label() function. 
         lidar_file = self.root_split_path / 'velodyne' / ('T%s.las' % idx) ## chnaged
         assert lidar_file.exists()
         lasfile = laspy.file.File(lidar_file, mode="r") ## added
-        return np.vstack((lasfile.x-30 , lasfile.y-30, lasfile.z-300)).transpose().astype(np.float32)
-        #return np.vstack((lasfile.x , lasfile.y, lasfile.z-lasfile.z.min())).transpose() ## changed to start z-value from 0
-    ## Tree data is composed of only lidar. 
-    ## so, we don't need any functions about image
-    '''
-    def get_image(self, idx):
-        """
-        Loads image for a sample
-        Args:
-            idx: int, Sample index
-        Returns:
-            image: (H, W, 3), RGB Image
-        """
-        img_file = self.root_split_path / 'image_2' / ('%s.png' % idx)
-        assert img_file.exists()
-        image = io.imread(img_file)
-        image = image.astype(np.float32)
-        image /= 255.0
-        return image
+        return np.vstack((lasfile.x-30 , lasfile.y-30, lasfile.z-300)).transpose().astype(np.float32) # must be same with line 37!!!!!
 
-    def get_image_shape(self, idx):
-        img_file = self.root_split_path / 'image_2' / ('%s.png' % idx)
-        assert img_file.exists()
-        return np.array(io.imread(img_file).shape[:2], dtype=np.int32)
-    '''
     def get_label(self, idx): # everything is modified
-        # z-axis center value is subtracted by minimum value of z-axis of corresponding lidar file
         label_file = self.root_split_path / 'labels' / ('%s.txt' % idx) 
-        #lidar_file = self.root_split_path / 'velodyne' / ('T%s.las' % idx)
         assert label_file.exists()
-        #assert lidar_file.exists()
 
-        #lasfile = laspy.file.File(lidar_file, mode="r")
-        #min_z = lasfile.z.min()
-        
         return get_objects_from_label(label_file)
-        #return get_objects_from_label(label_file, min_z)
-    '''
-    def get_depth_map(self, idx):
-        """
-        Loads depth map for a sample
-        Args:
-            idx: str, Sample index
-        Returns:
-            depth: (H, W), Depth map
-        """
-        depth_file = self.root_split_path / 'depth_2' / ('%s.png' % idx)
-        assert depth_file.exists()
-        depth = io.imread(depth_file)
-        depth = depth.astype(np.float32)
-        depth /= 256.0
-        return depth
 
-    def get_calib(self, idx):
-        calib_file = self.root_split_path / 'calib' / ('%s.txt' % idx)
-        assert calib_file.exists()
-        return calibration_kitti.Calibration(calib_file)
-
-    def get_road_plane(self, idx):
-        plane_file = self.root_split_path / 'planes' / ('%s.txt' % idx)
-        if not plane_file.exists():
-            return None
-
-        with open(plane_file, 'r') as f:
-            lines = f.readlines()
-        lines = [float(i) for i in lines[3].split()]
-        plane = np.asarray(lines)
-
-        # Ensure normal is always facing up, this is in the rectified camera coordinate
-        if plane[1] > 0:
-            plane = -plane
-
-        norm = np.linalg.norm(plane[0:3])
-        plane = plane / norm
-        return plane
-   
-    @staticmethod
-    def get_fov_flag(pts_rect, img_shape, calib):
-        """
-        Args:
-            pts_rect:
-            img_shape:
-            calib:
-
-        Returns:
-
-        """
-        pts_img, pts_rect_depth = calib.rect_to_img(pts_rect)
-        val_flag_1 = np.logical_and(pts_img[:, 0] >= 0, pts_img[:, 0] < img_shape[1])
-        val_flag_2 = np.logical_and(pts_img[:, 1] >= 0, pts_img[:, 1] < img_shape[0])
-        val_flag_merge = np.logical_and(val_flag_1, val_flag_2)
-        pts_valid_flag = np.logical_and(val_flag_merge, pts_rect_depth >= 0)
-
-        return pts_valid_flag
-    '''
     # get_infos is used for making pkl files
     def get_infos(self, num_workers=4, has_label=True, count_inside_pts=True, sample_id_list=None): ## modified
         import concurrent.futures as futures
@@ -223,44 +125,30 @@ class TreeDataset(DatasetTemplate):
             pc_info = {'num_features': 3, 'lidar_idx': sample_idx} ## changed
             info['point_cloud'] = pc_info
 
-            #image_info = {'image_idx': sample_idx, 'image_shape': self.get_image_shape(sample_idx)}
-            #info['image'] = image_info
-            #calib = self.get_calib(sample_idx)
-
-            #P2 = np.concatenate([calib.P2, np.array([[0., 0., 0., 1.]])], axis=0)
-            #R0_4x4 = np.zeros([4, 4], dtype=calib.R0.dtype)
-            #R0_4x4[3, 3] = 1.
-            #R0_4x4[:3, :3] = calib.R0
-            #V2C_4x4 = np.concatenate([calib.V2C, np.array([[0., 0., 0., 1.]])], axis=0)
-            #calib_info = {'P2': P2, 'R0_rect': R0_4x4, 'Tr_velo_to_cam': V2C_4x4}
-
-            #info['calib'] = calib_info
-
             if has_label:
                 obj_list = self.get_label(sample_idx)
                 annotations = {}
                 annotations['name'] = np.array([obj.cls_type for obj in obj_list])
                 annotations['truncated'] = np.array([obj.truncation for obj in obj_list])
                 annotations['occluded'] = np.array([obj.occlusion for obj in obj_list])
-                annotations['alpha'] = np.array([obj.alpha for obj in obj_list]) # all is 0
-                annotations['bbox'] = np.concatenate([obj.box2d.reshape(1, 4) for obj in obj_list], axis=0)
+                #annotations['alpha'] = np.array([obj.alpha for obj in obj_list]) # all is 0
+                #annotations['bbox'] = np.concatenate([obj.box2d.reshape(1, 4) for obj in obj_list], axis=0)
                 annotations['dimensions'] = np.array([[obj.l, obj.w, obj.h] for obj in obj_list]) # lwh(lidar) format
                 annotations['location'] = np.concatenate([obj.loc.reshape(1, 3) for obj in obj_list], axis=0)
                 annotations['rotation_y'] = np.array([obj.ry for obj in obj_list])
                 annotations['score'] = np.array([obj.score for obj in obj_list])
                 annotations['difficulty'] = np.array([obj.level for obj in obj_list], np.int32)
 
-                num_objects = len([obj.cls_type for obj in obj_list if obj.cls_type != 'DontCare'])
-                num_gt = len(annotations['name'])
-                index = list(range(num_objects)) + [-1] * (num_gt - num_objects)
+                #num_objects = len([obj.cls_type for obj in obj_list]) #if obj.cls_type != 'DontCare'])
+                #num_gt = len(annotations['name'])
+                num_objects = len(annotations['name'])
+                index = list(range(num_objects)) #+ [-1] * (num_gt - num_objects)
                 annotations['index'] = np.array(index, dtype=np.int32)
 
-                loc = annotations['location'][:num_objects]
-                dims = annotations['dimensions'][:num_objects]
-                rots = annotations['rotation_y'][:num_objects]
-                #loc_lidar = calib.rect_to_lidar(loc)
+                loc = annotations['location']  #[:num_objects]
+                dims = annotations['dimensions'] #[:num_objects]
+                rots = annotations['rotation_y'] #[:num_objects]
                 l, w, h = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3] # Changed!!!! for lwh format
-                #loc_lidar[:, 2] += h[:, 0] / 2
                 gt_boxes_lidar = np.concatenate([loc, l, w, h, rots[..., np.newaxis]], axis=1) # changed
                 annotations['gt_boxes_lidar'] = gt_boxes_lidar
 
@@ -268,13 +156,8 @@ class TreeDataset(DatasetTemplate):
 
                 if count_inside_pts:
                     points = self.get_lidar(sample_idx)
-                    #calib = self.get_calib(sample_idx)
-                    #pts_rect = calib.lidar_to_rect(points[:, 0:3])
-
-                    #fov_flag = self.get_fov_flag(pts_rect, info['image']['image_shape'], calib)
-                    #pts_fov = points[fov_flag]
                     corners_lidar = box_utils.boxes_to_corners_3d(gt_boxes_lidar)
-                    num_points_in_gt = -np.ones(num_gt, dtype=np.int32)
+                    num_points_in_gt = -np.ones(num_objects, dtype=np.int32) #(num_gt, dtype=np.int32)
 
                     for k in range(num_objects):
                         flag = box_utils.in_hull(points, corners_lidar[k]) ## changed
@@ -308,7 +191,7 @@ class TreeDataset(DatasetTemplate):
             annos = info['annos']
             names = annos['name']
             difficulty = annos['difficulty']
-            bbox = annos['bbox']
+            #bbox = annos['bbox']
             gt_boxes = annos['gt_boxes_lidar']
 
             num_obj = gt_boxes.shape[0]
@@ -324,13 +207,13 @@ class TreeDataset(DatasetTemplate):
                 gt_points[:, :3] -= gt_boxes[i, :3]
                 with open(filepath, 'w') as f:
                     #gt_points.astype(np.float32).tofile(f)
-                    gt_points.tofile(f)  ## this file seems to be used for sampling augmentation ##
+                    gt_points.tofile(f)  ## gt_point should be float32 and this file is used for sampling augmentation
 
                 if (used_classes is None) or names[i] in used_classes:
                     db_path = str(filepath.relative_to(self.root_path))  # gt_database/xxxxx.bin
                     db_info = {'name': names[i], 'path': db_path, 'gt_idx': i,  ## changed
                                'box3d_lidar': gt_boxes[i], 'num_points_in_gt': gt_points.shape[0],
-                               'difficulty': difficulty[i], 'bbox': bbox[i], 'score': annos['score'][i]} ## changed
+                               'difficulty': difficulty[i], 'score': annos['score'][i]} ## changed
                     if names[i] in all_db_infos:
                         all_db_infos[names[i]].append(db_info)
                     else:
@@ -358,14 +241,11 @@ class TreeDataset(DatasetTemplate):
 
         """
         def get_template_prediction(num_samples):
-            #ret_dict = {
-            #    'name': np.zeros(num_samples),
-            #    'score': np.zeros(num_samples), 'boxes_lidar': np.zeros([num_samples, 7])
-            #}
             ret_dict = {
                 'name': np.zeros(num_samples), 'truncated': np.zeros(num_samples),
                 'occluded': np.zeros(num_samples), 'alpha': np.zeros(num_samples),
-                'bbox': np.zeros([num_samples, 4]), 'dimensions': np.zeros([num_samples, 3]),
+                #'bbox': np.zeros([num_samples, 4]), 
+                'dimensions': np.zeros([num_samples, 3]),
                 'location': np.zeros([num_samples, 3]), 'rotation_y': np.zeros(num_samples),
                 'score': np.zeros(num_samples), 'boxes_lidar': np.zeros([num_samples, 7])
             }
@@ -379,15 +259,9 @@ class TreeDataset(DatasetTemplate):
             if pred_scores.shape[0] == 0:
                 return pred_dict
 
-            #calib = batch_dict['calib'][batch_index]
-            #image_shape = batch_dict['image_shape'][batch_index].cpu().numpy()
-            #pred_boxes_camera = box_utils.boxes3d_lidar_to_kitti_camera(pred_boxes, calib)
-            #pred_boxes_img = box_utils.boxes3d_kitti_camera_to_imageboxes(
-            #    pred_boxes_camera, calib, image_shape=image_shape
-            #)
             
             pred_dict['name'] = np.array(class_names)[pred_labels - 1]
-            pred_dict['alpha'] = np.zeros_like(pred_boxes[:, 6]) #-np.arctan2(-pred_boxes[:, 1], pred_boxes[:, 0]) + pred_boxes[:, 6]
+            #pred_dict['alpha'] = np.zeros_like(pred_boxes[:, 6]) #-np.arctan2(-pred_boxes[:, 1], pred_boxes[:, 0]) + pred_boxes[:, 6]
             pred_dict['dimensions'] = pred_boxes[:, 3:6]
             pred_dict['location'] = pred_boxes[:, 0:3]
             pred_dict['rotation_y'] = np.zeros_like(pred_boxes[:, 6]) # set to 0.0, original code was pred_boxes[:, 6]
@@ -395,16 +269,6 @@ class TreeDataset(DatasetTemplate):
             pred_dict['score'] = pred_scores
             pred_dict['boxes_lidar'] = pred_boxes
             pred_dict['boxes_lidar'][:, 6] = 0.0 # changed
-
-            # make order of bbox same to Object3d class
-            pred_dict['bbox'][:,0] = pred_dict['location'][:, 0] - \
-                                     (pred_dict['dimensions'][:,0]/2)  
-            pred_dict['bbox'][:,1] = pred_dict['location'][:, 1] - \
-                                     (pred_dict['dimensions'][:,1]/2)
-            pred_dict['bbox'][:,2] = pred_dict['location'][:, 0] + \
-                                     (pred_dict['dimensions'][:,0]/2)
-            pred_dict['bbox'][:,3] = pred_dict['location'][:, 1] + \
-                                     (pred_dict['dimensions'][:,1]/2)
 
             return pred_dict
 
@@ -419,14 +283,13 @@ class TreeDataset(DatasetTemplate):
             if output_path is not None:
                 cur_det_file = output_path / ('%s.txt' % frame_id)
                 with open(cur_det_file, 'w') as f:
-                    bbox = single_pred_dict['bbox']
+                    #bbox = single_pred_dict['bbox']
                     loc = single_pred_dict['location']
                     dims = single_pred_dict['dimensions']  # lwh
-
-                    for idx in range(len(bbox)):
-                        print('%s -1 -1 %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f'
-                              % (single_pred_dict['name'][idx], single_pred_dict['alpha'][idx],
-                                 bbox[idx][0], bbox[idx][1], bbox[idx][2], bbox[idx][3],
+                    for idx in range(len(dims)):
+                        priint ('%s -1 -1 %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f'
+                              % (single_pred_dict['name'][idx], #single_pred_dict['alpha'][idx],
+                                 #bbox[idx][0], bbox[idx][1], bbox[idx][2], bbox[idx][3],
                                  dims[idx][1], dims[idx][2], dims[idx][0], loc[idx][0],
                                  loc[idx][1], loc[idx][2], single_pred_dict['rotation_y'][idx],
                                  single_pred_dict['score'][idx]), file=f)
@@ -442,10 +305,6 @@ class TreeDataset(DatasetTemplate):
         eval_det_annos = copy.deepcopy(det_annos)
         eval_gt_annos = [copy.deepcopy(info['annos']) for info in self.tree_infos] ## changed
 
-        #with open('gt_annos.pkl', 'wb') as f:
-        #    gt_annos = pickle.dump(eval_gt_annos, f)
-        #with open('dt_annos.pkl', 'wb') as f:
-        #    dt_annos = pickle.dump(eval_det_annos, f)
         ap_result_str, ap_dict = tree_eval.get_tree_eval_result(eval_gt_annos, eval_det_annos, class_names) ## changed
         
         return ap_result_str, ap_dict
@@ -464,62 +323,30 @@ class TreeDataset(DatasetTemplate):
         info = copy.deepcopy(self.tree_infos[index])  ## changed
 
         sample_idx = info['point_cloud']['lidar_idx']
-        #img_shape = info['image']['image_shape']
-        #calib = self.get_calib(sample_idx)
         get_item_list = self.dataset_cfg.get('GET_ITEM_LIST', ['points'])
 
         input_dict = {
             'frame_id': sample_idx,
-            #'calib': calib,
         }
 
         if 'annos' in info:
             annos = info['annos']
-            annos = common_utils.drop_info_with_name(annos, name='DontCare')
+            #annos = common_utils.drop_info_with_name(annos, name='DontCare')
             loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
             gt_names = annos['name']
-            #gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
-            #gt_boxes_lidar = box_utils.boxes3d_kitti_camera_to_lidar(gt_boxes_camera, calib)
             gt_boxes_lidar = annos['gt_boxes_lidar'] # added
 
             input_dict.update({
                 'gt_names': gt_names,
                 'gt_boxes': gt_boxes_lidar
             })
-            #input_dict['gt_names'] = gt_names
-            #input_dict['gt_boxes'] = gt_boxes_lidar
-            #if "gt_boxes2d" in get_item_list:
-            #    input_dict['gt_boxes2d'] = annos["bbox"]
-
-            #road_plane = self.get_road_plane(sample_idx)
-            #if road_plane is not None:
-            #    input_dict['road_plane'] = road_plane
 
         if "points" in get_item_list:
             points = self.get_lidar(sample_idx)
-            #if self.dataset_cfg.FOV_POINTS_ONLY:
-            #    pts_rect = calib.lidar_to_rect(points[:, 0:3])
-            #    fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
-            #    points = points[fov_flag]
             input_dict['points'] = points
 
-        #if "images" in get_item_list:
-        #    input_dict['images'] = self.get_image(sample_idx)
-
-        #if "depth_maps" in get_item_list:
-        #    input_dict['depth_maps'] = self.get_depth_map(sample_idx)
-
-        #if "calib_matricies" in get_item_list:
-        #    input_dict["trans_lidar_to_cam"], input_dict["trans_cam_to_img"] = kitti_utils.calib_to_matricies(calib)
-        #print ('11111111111\n', input_dict['frame_id'], input_dict['points'])
         data_dict = self.prepare_data(data_dict=input_dict)
-        #print ('after prepare_data', data_dict['frame_id'], data_dict['points'])
-        #print ('getitem:', data_dict)
-        #print (100 * '#')
-        #print ('getitem_name: ')
-        #print (data_dict['gt_names'])
 
-        #data_dict['image_shape'] = img_shape
         return data_dict
 
 
