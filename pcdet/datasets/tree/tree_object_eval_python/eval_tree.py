@@ -219,13 +219,25 @@ def eval_class(gt_annos, dt_annos, metric, iou_th):
     fp = []
     dificulties = []
     for i, overlap in enumerate(overlaps) :
-        num_gt_per_file, num_dt_per_file = overlap.shape
-        tp_per_file = np.zeros(num_dt_per_file)
-        fp_per_file = np.ones(num_dt_per_file)
-        dificulties_per_file = np.zeros(num_dt_per_file) - 1.
+        ###################
+        dt_indices = []
+        gt_indices = []
+        if total_dt_num[i] != 0 :
+            while np.max(overlap) > iou_th :
+                r, c = np.unravel_index(np.argmax(overlap, axis=None), overlap.shape)
+                overlap[r,:] = -1.0
+                overlap[:,c] = -1.0
+                dt_indices.append(c)
+                gt_indices.append(r)
+        else :
+            gt_indices = [x for x in range(total_gt_num[i])]
+        #########################
+        #num_gt_per_file, num_dt_per_file = overlap.shape
+        tp_per_file = np.zeros(total_dt_num[i])
+        fp_per_file = np.ones(total_dt_num[i])
+        dificulties_per_file = np.zeros(total_dt_num[i]) - 1.
 
         gt_dificulties = gt_annos[i]['difficulty']
-        gt_indices, dt_indices = np.where(overlap > iou_th)
         num_tp_per_file = len(dt_indices) 
 
         if num_tp_per_file != 0 :
@@ -233,13 +245,13 @@ def eval_class(gt_annos, dt_annos, metric, iou_th):
             fp_per_file[dt_indices] = 0
             dificulties_per_file[dt_indices] = gt_dificulties[gt_indices]
 
-
         conf_per_file = dt_annos[i]['score']
 
         confidence.append(conf_per_file)
         tp.append(tp_per_file)
         fp.append(fp_per_file)
         dificulties.append(dificulties_per_file)
+        ####################
     
 
     confidence_fn = np.concatenate(confidence, axis=0)

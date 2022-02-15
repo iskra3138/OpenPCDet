@@ -24,11 +24,11 @@ DATA_AUGMENTOR:
           DB_INFO_PATH:
              - tree_dbinfos_train.pkl
           PREPARE: {
-              filter_by_min_points: ['tree:1'],
+              filter_by_min_points: ['tree:10'],
               filter_by_difficulty: [0] # -1
           }
 
-          SAMPLE_GROUPS: ['tree:20']
+          SAMPLE_GROUPS: ['tree:5']
           NUM_POINT_FEATURES: 3
           DATABASE_WITH_FAKELIDAR: False
           REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
@@ -61,10 +61,10 @@ DATA_PROCESSOR:
         'test': False
       }
 
-    - NAME: transform_points_to_voxels
-      VOXEL_SIZE: [0.125, 0.125, 0.8]
-      MAX_POINTS_PER_VOXEL: 120
-      MAX_NUMBER_OF_VOXELS: {
-        'train': 20000,
-        'test': 40000
-      }
+    #- NAME: transform_points_to_voxels
+    #  VOXEL_SIZE: [0.125, 0.125, 0.8]
+    #  MAX_POINTS_PER_VOXEL: 120
+    #  MAX_NUMBER_OF_VOXELS: {
+    #    'train': 20000,
+    #    'test': 40000
+    #  }

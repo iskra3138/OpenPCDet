@@ -276,7 +276,7 @@ def main():
                     iou_log += ']\n'
                 logger.info(f"IoU \n{iou_log}")
 
-                while np.max(iou) > 0.1 :
+                while np.max(iou) > 0.7 :
                     r, c = np.unravel_index(np.argmax(iou, axis=None), iou.shape)
                     result_str = '{}, {}, detected, {:.2f}, {:.2f}, '.format(file_name, r, np.max(iou), pred_dicts[0]['pred_scores'][c])
                     result_str += '{}, {}, '.format(data_dict['truncated'][0][r], data_dict['occluded'][0][r])
